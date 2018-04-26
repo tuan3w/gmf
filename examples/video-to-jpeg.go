@@ -6,7 +6,7 @@ import (
 	"runtime/debug"
 	"strconv"
 
-	. "github.com/3d0c/gmf"
+	"github.com/tuan3w/gmf"
 )
 
 func fatal(err error) {
@@ -55,40 +55,41 @@ func main() {
 		srcFileName = os.Args[1]
 	}
 
-	inputCtx := assert(NewInputCtx(srcFileName)).(*FmtCtx)
+	inputCtx := assert(gmf.NewInputCtx(srcFileName)).(*gmf.FmtCtx)
 	defer inputCtx.CloseInputAndRelease()
 
-	srcVideoStream, err := inputCtx.GetBestStream(AVMEDIA_TYPE_VIDEO)
+	srcVideoStream, err := inputCtx.GetBestStream(gmf.AVMEDIA_TYPE_VIDEO)
 	if err != nil {
 		log.Println("No video stream found in", srcFileName)
 	}
 
-	codec, err := FindEncoder(AV_CODEC_ID_JPEG2000)
+	codec, err := gmf.FindEncoder(gmf.AV_CODEC_ID_JPEG2000)
 	if err != nil {
 		fatal(err)
 	}
 
-	cc := NewCodecCtx(codec)
-	defer Release(cc)
+	cc := gmf.NewCodecCtx(codec)
+	defer gmf.Release(cc)
 
-	cc.SetPixFmt(AV_PIX_FMT_RGB24).SetWidth(srcVideoStream.CodecCtx().Width()).SetHeight(srcVideoStream.CodecCtx().Height())
+	cc.SetPixFmt(gmf.AV_PIX_FMT_RGB24).SetWidth(srcVideoStream.CodecCtx().Width()).SetHeight(srcVideoStream.CodecCtx().Height())
+	cc.SetTimeBase(srcVideoStream.CodecCtx().TimeBase().AVR())
 
 	if codec.IsExperimental() {
-		cc.SetStrictCompliance(FF_COMPLIANCE_EXPERIMENTAL)
+		cc.SetStrictCompliance(gmf.FF_COMPLIANCE_EXPERIMENTAL)
 	}
 
 	if err := cc.Open(nil); err != nil {
 		fatal(err)
 	}
 
-	swsCtx := NewSwsCtx(srcVideoStream.CodecCtx(), cc, SWS_BICUBIC)
-	defer Release(swsCtx)
+	swsCtx := gmf.NewSwsCtx(srcVideoStream.CodecCtx(), cc, gmf.SWS_BICUBIC)
+	defer gmf.Release(swsCtx)
 
-	dstFrame := NewFrame().
+	dstFrame := gmf.NewFrame().
 		SetWidth(srcVideoStream.CodecCtx().Width()).
 		SetHeight(srcVideoStream.CodecCtx().Height()).
-		SetFormat(AV_PIX_FMT_RGB24)
-	defer Release(dstFrame)
+		SetFormat(gmf.AV_PIX_FMT_RGB24)
+	defer gmf.Release(dstFrame)
 
 	if err := dstFrame.ImgAlloc(); err != nil {
 		fatal(err)
@@ -99,19 +100,19 @@ func main() {
 			// skip non video streams
 			continue
 		}
-		ist := assert(inputCtx.GetStream(packet.StreamIndex())).(*Stream)
+		ist := assert(inputCtx.GetStream(packet.StreamIndex())).(*gmf.Stream)
 
 		for frame := range packet.Frames(ist.CodecCtx()) {
 			swsCtx.Scale(frame, dstFrame)
 
 			if p, ready, _ := dstFrame.EncodeNewPacket(cc); ready {
 				writeFile(p.Data())
-				defer Release(p)
+				defer gmf.Release(p)
 			}
 		}
-		Release(packet)
+		gmf.Release(packet)
 	}
 
-	Release(dstFrame)
+	gmf.Release(dstFrame)
 
 }

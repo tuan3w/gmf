@@ -1,8 +1,7 @@
 ### Go FFmpeg Bindings 
 
-#### Status: `beta`
-It covers very basic avformat, avcodec and swscale features.    
-More bindings and cool features are coming soon.
+A fork from https://github.com/3d0c/gmf
+Tested with ffmpeg version 3.0.8
 
 #### Installation
 ##### Prerequisites

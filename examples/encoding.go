@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	. "github.com/3d0c/gmf"
+	"github.com/tuan3w/gmf"
 )
 
 func fatal(err error) {
@@ -16,18 +16,18 @@ func main() {
 	outputfilename := "sample-encoding.mpg"
 	dstWidth, dstHeight := 640, 480
 
-	codec, err := FindEncoder(AV_CODEC_ID_MPEG1VIDEO)
+	codec, err := gmf.FindEncoder(gmf.AV_CODEC_ID_MPEG1VIDEO)
 	if err != nil {
 		fatal(err)
 	}
 
-	videoEncCtx := NewCodecCtx(codec)
+	videoEncCtx := gmf.NewCodecCtx(codec)
 	if videoEncCtx == nil {
 		fatal(err)
 	}
-	defer Release(videoEncCtx)
+	defer gmf.Release(videoEncCtx)
 
-	outputCtx, err := NewOutputCtx(outputfilename)
+	outputCtx, err := gmf.NewOutputCtx(outputfilename)
 	if err != nil {
 		fatal(err)
 	}
@@ -36,20 +36,20 @@ func main() {
 		SetBitRate(400000).
 		SetWidth(dstWidth).
 		SetHeight(dstHeight).
-		SetTimeBase(AVR{1, 25}).
-		SetPixFmt(AV_PIX_FMT_YUV420P).
-		SetProfile(FF_PROFILE_MPEG4_SIMPLE).
-		SetMbDecision(FF_MB_DECISION_RD)
+		SetTimeBase(gmf.AVR{1, 25}).
+		SetPixFmt(gmf.AV_PIX_FMT_YUV420P).
+		SetProfile(gmf.FF_PROFILE_MPEG4_SIMPLE).
+		SetMbDecision(gmf.FF_MB_DECISION_RD)
 
 	if outputCtx.IsGlobalHeader() {
-		videoEncCtx.SetFlag(CODEC_FLAG_GLOBAL_HEADER)
+		videoEncCtx.SetFlag(gmf.CODEC_FLAG_GLOBAL_HEADER)
 	}
 
 	videoStream := outputCtx.NewStream(codec)
 	if videoStream == nil {
 		fatal(errors.New(fmt.Sprintf("Unable to create stream for videoEnc [%s]\n", codec.LongName())))
 	}
-	defer Release(videoStream)
+	defer gmf.Release(videoStream)
 
 	if err := videoEncCtx.Open(nil); err != nil {
 		fatal(err)
@@ -63,19 +63,19 @@ func main() {
 		fatal(err)
 	}
 
-	var frame *Frame
+	var frame *gmf.Frame
 	i := int64(0)
 
-	for frame = range GenSyntVideoNewFrame(videoEncCtx.Width(), videoEncCtx.Height(), videoEncCtx.PixFmt()) {
+	for frame = range gmf.GenSyntVideoNewFrame(videoEncCtx.Width(), videoEncCtx.Height(), videoEncCtx.PixFmt()) {
 		frame.SetPts(i)
 
 		if p, ready, err := frame.EncodeNewPacket(videoStream.CodecCtx()); ready {
-			if p.Pts() != AV_NOPTS_VALUE {
-				p.SetPts(RescaleQ(p.Pts(), videoStream.CodecCtx().TimeBase(), videoStream.TimeBase()))
+			if p.Pts() != gmf.AV_NOPTS_VALUE {
+				p.SetPts(gmf.RescaleQ(p.Pts(), videoStream.CodecCtx().TimeBase(), videoStream.TimeBase()))
 			}
 
-			if p.Dts() != AV_NOPTS_VALUE {
-				p.SetDts(RescaleQ(p.Dts(), videoStream.CodecCtx().TimeBase(), videoStream.TimeBase()))
+			if p.Dts() != gmf.AV_NOPTS_VALUE {
+				p.SetDts(gmf.RescaleQ(p.Dts(), videoStream.CodecCtx().TimeBase(), videoStream.TimeBase()))
 			}
 
 			if err := outputCtx.WritePacket(p); err != nil {
@@ -84,7 +84,7 @@ func main() {
 
 			log.Printf("Write frame=%d size=%v pts=%v dts=%v\n", frame.Pts(), p.Size(), p.Pts(), p.Dts())
 
-			Release(p)
+			gmf.Release(p)
 
 		} else if err != nil {
 			fatal(err)
@@ -93,7 +93,7 @@ func main() {
 		}
 
 		i++
-		Release(frame)
+		gmf.Release(frame)
 	}
 
 	outputCtx.CloseOutputAndRelease()

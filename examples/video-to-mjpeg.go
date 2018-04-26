@@ -6,7 +6,7 @@ import (
 	"runtime/debug"
 	"strconv"
 
-	. "github.com/3d0c/gmf"
+	"github.com/tuan3w/gmf"
 )
 
 func fatal(err error) {
@@ -55,29 +55,29 @@ func main() {
 		srcFileName = os.Args[1]
 	}
 
-	inputCtx := assert(NewInputCtx(srcFileName)).(*FmtCtx)
+	inputCtx := assert(gmf.NewInputCtx(srcFileName)).(*gmf.FmtCtx)
 	defer inputCtx.CloseInputAndRelease()
 
-	srcVideoStream, err := inputCtx.GetBestStream(AVMEDIA_TYPE_VIDEO)
+	srcVideoStream, err := inputCtx.GetBestStream(gmf.AVMEDIA_TYPE_VIDEO)
 	if err != nil {
 		log.Println("No video stream found in", srcFileName)
 	}
 
-	codec, err := FindEncoder("mjpeg")
+	codec, err := gmf.FindEncoder("mjpeg")
 	if err != nil {
 		fatal(err)
 	}
 
-	cc := NewCodecCtx(codec)
-	defer Release(cc)
+	cc := gmf.NewCodecCtx(codec)
+	defer gmf.Release(cc)
 
-	cc.SetPixFmt(AV_PIX_FMT_YUVJ420P)
+	cc.SetPixFmt(gmf.AV_PIX_FMT_YUVJ420P)
 	cc.SetWidth(srcVideoStream.CodecCtx().Width())
 	cc.SetHeight(srcVideoStream.CodecCtx().Height())
 	cc.SetTimeBase(srcVideoStream.CodecCtx().TimeBase().AVR())
 
 	if codec.IsExperimental() {
-		cc.SetStrictCompliance(FF_COMPLIANCE_EXPERIMENTAL)
+		cc.SetStrictCompliance(gmf.FF_COMPLIANCE_EXPERIMENTAL)
 	}
 
 	if err := cc.Open(nil); err != nil {
@@ -89,14 +89,14 @@ func main() {
 			// skip non video streams
 			continue
 		}
-		ist := assert(inputCtx.GetStream(packet.StreamIndex())).(*Stream)
+		ist := assert(inputCtx.GetStream(packet.StreamIndex())).(*gmf.Stream)
 
 		for frame := range packet.Frames(ist.CodecCtx()) {
 			if p, ready, _ := frame.EncodeNewPacket(cc); ready {
 				writeFile(p.Data())
-				defer Release(p)
+				defer gmf.Release(p)
 			}
 		}
-		Release(packet)
+		gmf.Release(packet)
 	}
 }

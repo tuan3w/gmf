@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/3d0c/gmf"
+	"github.com/tuan3w/gmf"
 )
 
 func assert(i interface{}, err error) interface{} {

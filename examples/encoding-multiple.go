@@ -1,6 +1,6 @@
 package main
 
-// BUG(3d0c):
+// BUG(tuan3w):
 // 1.
 //   Insufficient thread locking around avcodec_open/close()
 //   [NULL @ 0x6001200] No lock manager is set, please see av_lockmgr_register()
@@ -14,7 +14,7 @@ import (
 	"log"
 	"sync"
 
-	. "github.com/3d0c/gmf"
+	"github.com/tuan3w/gmf"
 )
 
 func fatal(err error) {
@@ -24,24 +24,24 @@ func fatal(err error) {
 type output struct {
 	filename string
 	codec    interface{}
-	data     chan *Frame
+	data     chan *gmf.Frame
 }
 
 func encodeWorker(o output, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	codec, err := FindEncoder(o.codec)
+	codec, err := gmf.FindEncoder(o.codec)
 	if err != nil {
 		fatal(err)
 	}
 
-	videoEncCtx := NewCodecCtx(codec)
+	videoEncCtx := gmf.NewCodecCtx(codec)
 	if videoEncCtx == nil {
 		fatal(err)
 	}
-	defer Release(videoEncCtx)
+	defer gmf.Release(videoEncCtx)
 
-	outputCtx, err := NewOutputCtx(o.filename)
+	outputCtx, err := gmf.NewOutputCtx(o.filename)
 	if err != nil {
 		fatal(err)
 	}
@@ -50,26 +50,26 @@ func encodeWorker(o output, wg *sync.WaitGroup) {
 		SetBitRate(400000).
 		SetWidth(320).
 		SetHeight(200).
-		SetTimeBase(AVR{1, 25}).
-		SetPixFmt(AV_PIX_FMT_YUV420P)
+		SetTimeBase(gmf.AVR{1, 25}).
+		SetPixFmt(gmf.AV_PIX_FMT_YUV420P)
 
-	if o.codec == AV_CODEC_ID_MPEG1VIDEO {
-		videoEncCtx.SetMbDecision(FF_MB_DECISION_RD)
+	if o.codec == gmf.AV_CODEC_ID_MPEG1VIDEO {
+		videoEncCtx.SetMbDecision(gmf.FF_MB_DECISION_RD)
 	}
 
-	if o.codec == AV_CODEC_ID_MPEG4 {
-		videoEncCtx.SetProfile(FF_PROFILE_MPEG4_SIMPLE)
+	if o.codec == gmf.AV_CODEC_ID_MPEG4 {
+		videoEncCtx.SetProfile(gmf.FF_PROFILE_MPEG4_SIMPLE)
 	}
 
 	if outputCtx.IsGlobalHeader() {
-		videoEncCtx.SetFlag(CODEC_FLAG_GLOBAL_HEADER)
+		videoEncCtx.SetFlag(gmf.CODEC_FLAG_GLOBAL_HEADER)
 	}
 
 	videoStream := outputCtx.NewStream(codec)
 	if videoStream == nil {
 		fatal(errors.New(fmt.Sprintf("Unable to create stream for videoEnc [%s]\n", codec.LongName())))
 	}
-	defer Release(videoStream)
+	defer gmf.Release(videoStream)
 
 	if err := videoEncCtx.Open(nil); err != nil {
 		fatal(err)
@@ -92,12 +92,12 @@ func encodeWorker(o output, wg *sync.WaitGroup) {
 		}
 
 		if p, ready, err := frame.EncodeNewPacket(videoStream.CodecCtx()); ready {
-			if p.Pts() != AV_NOPTS_VALUE {
-				p.SetPts(RescaleQ(p.Pts(), videoStream.CodecCtx().TimeBase(), videoStream.TimeBase()))
+			if p.Pts() != gmf.AV_NOPTS_VALUE {
+				p.SetPts(gmf.RescaleQ(p.Pts(), videoStream.CodecCtx().TimeBase(), videoStream.TimeBase()))
 			}
 
-			if p.Dts() != AV_NOPTS_VALUE {
-				p.SetDts(RescaleQ(p.Dts(), videoStream.CodecCtx().TimeBase(), videoStream.TimeBase()))
+			if p.Dts() != gmf.AV_NOPTS_VALUE {
+				p.SetDts(gmf.RescaleQ(p.Dts(), videoStream.CodecCtx().TimeBase(), videoStream.TimeBase()))
 			}
 
 			if err := outputCtx.WritePacket(p); err != nil {
@@ -105,12 +105,12 @@ func encodeWorker(o output, wg *sync.WaitGroup) {
 			} else {
 				w++
 			}
-			Release(p)
+			gmf.Release(p)
 		} else if err != nil {
 			fatal(err)
 		}
 
-		Release(frame)
+		gmf.Release(frame)
 		i++
 	}
 
@@ -121,9 +121,9 @@ func encodeWorker(o output, wg *sync.WaitGroup) {
 
 func main() {
 	o := []output{
-		{"sample-enc-mpeg1.mpg", AV_CODEC_ID_MPEG1VIDEO, make(chan *Frame)},
-		{"sample-enc-mpeg2.mpg", AV_CODEC_ID_MPEG2VIDEO, make(chan *Frame)},
-		{"sample-enc-mpeg4.mp4", AV_CODEC_ID_MPEG4, make(chan *Frame)},
+		{"sample-enc-mpeg1.mpg", gmf.AV_CODEC_ID_MPEG1VIDEO, make(chan *gmf.Frame)},
+		{"sample-enc-mpeg2.mpg", gmf.AV_CODEC_ID_MPEG2VIDEO, make(chan *gmf.Frame)},
+		{"sample-enc-mpeg4.mp4", gmf.AV_CODEC_ID_MPEG4, make(chan *gmf.Frame)},
 	}
 
 	wg := new(sync.WaitGroup)
@@ -135,17 +135,17 @@ func main() {
 		wCount++
 	}
 
-	var srcFrame *Frame
+	var srcFrame *gmf.Frame
 	j := int64(0)
 
-	for srcFrame = range GenSyntVideoNewFrame(320, 200, AV_PIX_FMT_YUV420P) {
+	for srcFrame = range gmf.GenSyntVideoNewFrame(320, 200, gmf.AV_PIX_FMT_YUV420P) {
 		srcFrame.SetPts(j)
 		for i := 0; i < wCount; i++ {
-			Retain(srcFrame)
+			gmf.Retain(srcFrame)
 			o[i].data <- srcFrame
 		}
 		j += 1
-		Release(srcFrame)
+		gmf.Release(srcFrame)
 	}
 
 	for _, item := range o {

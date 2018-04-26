@@ -11,7 +11,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	. "github.com/3d0c/gmf"
+	"github.com/tuan3w/gmf"
 )
 
 func fatal(err error) {
@@ -50,38 +50,38 @@ func writeFile(b []byte) {
 	}
 }
 
-func encodeWorker(data chan *Frame, wg *sync.WaitGroup, srcCtx *CodecCtx) {
+func encodeWorker(data chan *gmf.Frame, wg *sync.WaitGroup, srcCtx *gmf.CodecCtx) {
 	defer wg.Done()
 	log.Println("worker started")
-	codec, err := FindEncoder(AV_CODEC_ID_JPEG2000)
+	codec, err := FindEncoder(gmf.AV_CODEC_ID_JPEG2000)
 	if err != nil {
 		fatal(err)
 	}
 
-	cc := NewCodecCtx(codec)
-	defer Release(cc)
+	cc := gmf.NewCodecCtx(codec)
+	defer gmf.Release(cc)
 
 	w, h := srcCtx.Width(), srcCtx.Height()
 
-	cc.SetPixFmt(AV_PIX_FMT_RGB24).SetWidth(w).SetHeight(h)
+	cc.SetPixFmt(gmf.AV_PIX_FMT_RGB24).SetWidth(w).SetHeight(h)
 
 	if codec.IsExperimental() {
-		cc.SetStrictCompliance(FF_COMPLIANCE_EXPERIMENTAL)
+		cc.SetStrictCompliance(gmf.FF_COMPLIANCE_EXPERIMENTAL)
 	}
 
 	if err := cc.Open(nil); err != nil {
 		fatal(err)
 	}
 
-	swsCtx := NewSwsCtx(srcCtx, cc, SWS_BICUBIC)
-	defer Release(swsCtx)
+	swsCtx := gmf.NewSwsCtx(srcCtx, cc, gmf.SWS_BICUBIC)
+	defer gmf.Release(swsCtx)
 
 	// convert to RGB, optionally resize could be here
-	dstFrame := NewFrame().
+	dstFrame := gmf.NewFrame().
 		SetWidth(w).
 		SetHeight(h).
-		SetFormat(AV_PIX_FMT_RGB24)
-	defer Release(dstFrame)
+		SetFormat(gmf.AV_PIX_FMT_RGB24)
+	defer gmf.Release(dstFrame)
 
 	if err := dstFrame.ImgAlloc(); err != nil {
 		fatal(err)
@@ -118,17 +118,17 @@ func main() {
 
 	flag.Parse()
 
-	inputCtx := assert(NewInputCtx(*srcFileName)).(*FmtCtx)
+	inputCtx := assert(gmf.NewInputCtx(*srcFileName)).(*FmtCtx)
 	defer inputCtx.CloseInputAndRelease()
 
-	srcVideoStream, err := inputCtx.GetBestStream(AVMEDIA_TYPE_VIDEO)
+	srcVideoStream, err := inputCtx.GetBestStream(gmf.AVMEDIA_TYPE_VIDEO)
 	if err != nil {
 		log.Println("No video stream found in", srcFileName)
 	}
 
 	wg := new(sync.WaitGroup)
 
-	dataChan := make(chan *Frame)
+	dataChan := make(chan *gmf.Frame)
 
 	for i := 0; i < *wnum; i++ {
 		wg.Add(1)
@@ -146,7 +146,7 @@ func main() {
 		for frame := range packet.Frames(ist.CodecCtx()) {
 			dataChan <- frame.CloneNewFrame()
 		}
-		Release(packet)
+		gmf.Release(packet)
 	}
 
 	close(dataChan)
